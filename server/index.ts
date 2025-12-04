@@ -60,6 +60,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Check for AI configuration
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "placeholder") {
+    log("WARNING: OPENAI_API_KEY is not configured or is using a placeholder value", "config");
+    log("AI features (NL-to-RFP, proposal parsing, comparison) will use fallback data", "config");
+    log("Add a valid OpenAI API key to enable full AI functionality", "config");
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
