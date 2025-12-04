@@ -1,0 +1,315 @@
+Aerchain invited you to the next hiring stage: a hands-on, real-world engineering challenge.
+Instead of MCQs, they want a single-user web application that automates an RFP (Request for Proposal) workflow end-to-end. Key parts:
+
+Round 1 — Take-home challenge: Build a working web app and submit:
+
+A public GitHub repo with source code and .env.example
+
+A 5–10 minute recorded walkthrough showing solution approach, tech choices, tradeoffs, and a short code tour (face visible & audible recommended)
+
+Submit via their form within 5 days of the email
+
+Core features required:
+
+Create RFPs from natural language, converting to a structured RFP schema.
+
+Manage vendors (vendor master data) and send RFPs by email to selected vendors.
+
+Receive vendor responses by email (at least one), parse free-form content/attachments with AI into structured data.
+
+Show a comparison view for proposals with AI-assisted summaries/scores/recommendations answering “Which vendor and why?”
+
+Technology & integrations (you choose; explain choices):
+
+Modern web stack (suggested React + Node/Express)
+
+Persistent DB (Postgres / MongoDB etc.)
+
+Real email integration (SMTP/IMAP or email API) for send + receive
+
+LLM integration for: NL → structured RFP, parsing vendor responses, and proposal comparison/recommendations
+
+Deliverables & docs: public repo with frontend/ and backend/, .env.example, detailed README (install/run, tech stack, API docs, design decisions, assumptions), API docs, seed data, and demo video link.
+
+Evaluation focus: problem modeling, architecture & code quality, API/data design, thoughtful AI use (prompts & flow), UX, and documented assumptions.
+
+Replit prompt (copy & paste into Replit description / new repl to scaffold and build the app)
+
+Use this full prompt exactly as written to scaffold a complete single-user RFP management web app (do not label this as an assignment). The repl should create a ready-to-run repo skeleton with frontend + backend, DB seeds, AI/email integration stubs, README, and scripts.
+
+Project goal: Build a single-user web app that lets a procurement manager create RFPs from natural language, send them to vendors by email, receive vendor replies and automatically parse them into structured proposals using an LLM, and compare vendor proposals with AI-assisted scoring/recommendations.
+
+Tech stack (scaffold these defaults, you may include optional alternatives in README)
+
+Frontend: React (Vite) + TypeScript, simple component structure, pages for dashboard, RFP create (chat-like NL input), vendors, RFP detail & comparison, and video demo recorder instructions.
+
+Backend: Node.js + Express (TypeScript recommended)
+
+Database: MongoDB (use mongoose); include a Docker Compose option for local dev (or instructions to use MongoDB Atlas).
+
+Email: abstraction supporting SMTP (nodemailer) and an API provider (SendGrid) — implement nodemailer SMTP by default; include IMAP receiving stub with mailparser and instructions to wire up real inbox credentials.
+
+AI: abstract LLM integration using OpenAI (server-side calls). Provide prompt templates and example code that calls OpenAI’s API for:
+
+NL → structured RFP extraction
+
+Vendor reply parsing (email body → structured proposal)
+
+Proposal comparison & scoring (generate summary + recommended vendor + explain why)
+
+File structure (create these folders & files):
+
+/frontend/ — React app
+
+src/pages/Dashboard.tsx, RfpCreate.tsx, Vendors.tsx, RfpDetail.tsx, Comparison.tsx
+
+src/components/ChatInput.tsx, RFPFormView.tsx, VendorList.tsx, ProposalCard.tsx
+
+src/services/api.ts (client wrapper)
+
+README_FRONTEND.md with start/build commands
+
+/backend/ — Express API
+
+src/index.ts (app bootstrap)
+
+src/routes/rfps.ts, vendors.ts, proposals.ts, emailWebhook.ts
+
+src/controllers/* and src/models/* (mongoose schemas for RFP, Vendor, Proposal)
+
+src/services/aiService.ts (LLM prompt functions), emailService.ts (send/receive), parserService.ts
+
+src/utils/prompts.ts with reusable prompt templates
+
+src/config.ts reading environment variables
+
+scripts/seed.ts to add sample vendors + a sample RFP
+
+README_BACKEND.md
+
+/.env.example with all required variables (no secrets):
+
+PORT=4000
+MONGODB_URI=
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+EMAIL_FROM=
+INBOUND_EMAIL_ADDRESS=   # mailbox used for vendor replies
+SENDGRID_API_KEY=
+OPENAI_API_KEY=
+FRONTEND_URL=http://localhost:5173
+
+
+README.md (top-level) listing prerequisites, setup steps, and the exact deliverables checklist.
+
+Required features & implementation details (include every minute detail)
+1) Create RFPs from natural language
+
+Frontend: a chat-like input where user types a natural language requirement (single paragraph or multi-sentence).
+
+Backend: endpoint POST /api/rfps/from-nl that:
+
+Accepts { text: string }
+
+Calls AI (function aiService.extractRfp(nlText)) using a prompt that extracts fields into JSON: title, items: [{ name, qty, specs }...], totalBudget, deliveryDays, paymentTerms, warranty, notes, mandatoryCriteria:[], optionalCriteria:[].
+
+Returns the structured RFP and persists it as an RFP document with status draft.
+
+Include client-side validation and ability to edit the structured RFP before saving/sending.
+
+2) Vendor master & sending RFPs
+
+Vendor model fields: name, email, contactPerson, rating, capabilities, tags, lastContactedAt.
+
+UI for creating/editing vendors and selecting multiple vendors for an RFP.
+
+Implement POST /api/rfps/:id/send which:
+
+Accepts vendorIds: []
+
+Creates a ProposalRequest record (or adds to RFP) and sends an email to each vendor with:
+
+Subject: Request for Proposal — <RFP.title>
+
+Body: structured RFP (human readable) and an instruction for vendors how to reply (must include prices & terms; they can attach PDF/Excel).
+
+Use emailService.sendRfpEmail(vendor, rfp) that uses nodemailer with SMTP_* env vars. Provide example templates in src/templates/rfpEmail.html.
+
+3) Receive and parse vendor responses
+
+Provide two implementation options in README:
+
+IMAP/POP/Forwarding: connect to an inbox via IMAP and poll or use webhooks to ingest incoming messages; use mailparser to extract text and attachments. Implement a basic IMAP poller script src/services/inboundEmailPoller.ts that can be enabled.
+
+Email API webhook: support a /api/email/webhook endpoint for SendGrid/Mailgun inbound parse.
+
+The system must parse at least one vendor response:
+
+When a message arrives, call aiService.parseVendorReply(emailText, attachmentsMeta) which returns structured proposal fields: vendorName, lineItems: [{ itemName, qty, unitPrice, total, warranty, deliveryDays }...], totalPrice, paymentTerms, notes, attachments: [{ filename, url }].
+
+Save as Proposal tied to the RFP and vendor.
+
+Include parsing logic for tables (the prompt should instruct the LLM to prefer JSON arrays and to extract numbers and currencies explicitly).
+
+4) Compare proposals & recommend
+
+UI GET /api/rfps/:id/comparison returns all proposals plus AI analysis:
+
+aiService.compareProposals(rfp, proposals[]) should output:
+
+scores: per-proposal numeric score (explain criteria: price, delivery, warranty, completeness, compliance)
+
+summary: short comparison paragraph
+
+recommendedVendorId and reason
+
+Provide a default scoring formula in backend (weighted): price (40%), delivery (20%), warranty (15%), completeness (15%), vendorRating (10%) — allow weights to be configurable.
+
+The AI should be used to produce an explanation and a human readable summary; numeric scores should come from deterministic formula, but AI may refine textual reasoning.
+
+5) API design & docs
+
+Document main endpoints in README and backend/README_BACKEND.md with method, path, request body examples and success/error responses for:
+
+POST /api/rfps/from-nl (input NL → response JSON)
+
+POST /api/rfps (create/edit)
+
+GET /api/rfps/:id
+
+POST /api/rfps/:id/send (send to vendors)
+
+POST /api/email/webhook (inbound)
+
+GET /api/rfps/:id/comparison
+
+GET /api/vendors, POST /api/vendors
+
+Provide example curl requests and example responses.
+
+6) Readme, decisions & assumptions
+
+README must include:
+
+Overview & context (what the app does)
+
+Prerequisites (Node version, MongoDB instructions)
+
+Install & run steps (frontend & backend) and .env explanation
+
+How to configure email sending and receiving (IMAP vs webhook)
+
+How to configure AI (OpenAI key) and prompt design notes (include prompt templates)
+
+API docs (endpoints + examples)
+
+Seed/Dev data & how to run npm run seed
+
+Deliverables checklist (repo, .env.example, README, demo video)
+
+Decisions & assumptions: describe RFP schema, scoring weights, what formats are expected from vendors, and limitations (e.g., attachments parsed only as text unless OCR added)
+
+“What I’d do next” section listing potential improvements (auth, multi-tenant, versioning, better attachment parsing/OCR, structured attachment ingestion).
+
+7) Demo video checklist (5–10 minutes)
+
+Show: create RFP from NL and the structured RFP result
+
+Show: vendor management and sending RFP via email (send to a test mailbox)
+
+Show: receiving one vendor response and automatic parsing into system
+
+Show: comparison page with AI summaries and recommendation
+
+Short code walkthrough: key files (AI prompts, parsing code, email integration)
+
+Add in README where to upload this (Loom link or public GDrive). Provide sample narration bullet points.
+
+8) Extra (helpful) inclusions
+
+Example prompt templates (in src/utils/prompts.ts) for:
+
+extractRfpPrompt — instruct LLM to output strict JSON, include currency parsing rules, and fallback values
+
+parseReplyPrompt — instruct to handle messy tables, label currencies, quantities, and map to RFP items
+
+comparePrompt — produce a short paragraph comparing proposals and explain tradeoffs
+
+Add unit tests for core backend functions (parsing helpers, scoring logic) with Jest.
+
+Add Postman collection or insomnia export for API testing.
+
+Provide .env.example and testing mailbox notes (use Mailtrap or a test Gmail with app password for easy testing).
+
+Add seed data: 3 vendors and 1 sample RFP + 2 sample vendor reply email files (in /seed/emails/) to demonstrate parsing.
+
+Scripts & npm commands (include in package.json)
+
+frontend: dev, build, start
+
+backend:
+
+dev (ts-node / nodemon)
+
+start (compiled node)
+
+seed (seed sample data)
+
+test (run Jest tests)
+
+poll:inbound (start IMAP poller)
+
+run:all (start backend + frontend concurrently for demo)
+
+Prompt & AI usage guidance to include in repo (exact text snippet)
+
+Add a file AI_PROMPTS.md containing these exact prompts (examples must be in the repo). For example:
+
+Extract RFP prompt (to LLM):
+
+You are an assistant that extracts procurement requirements into strict JSON. Input: a natural language paragraph describing what to buy. Output: a single JSON object with keys:
+title, items (array of {name, qty, specs}), totalBudget (number in USD), currency, deliveryDays (integer), paymentTerms (string), warranty (string), notes (string), mandatoryCriteria (array), optionalCriteria (array).
+
+If any numeric field is not stated, set it to null. DO NOT include extra text. Return valid JSON only.
+
+
+Parse vendor reply prompt (to LLM):
+
+You receive an email body (may include free text and pasted tables). Extract a proposal JSON:
+{ vendorName, lineItems: [{ itemName, qty, unitPrice, totalPrice, warranty, deliveryDays }], totalPrice, paymentTerms, notes }.
+Identify currencies and convert if possible (note currency symbol). Return JSON only.
+
+
+Compare proposals prompt (to LLM) — use LLM for textual explanation only, numeric scores computed by backend.
+
+UX / UI guidance (brief)
+
+Keep UI minimal and clear. RFP create should show NL input → parsed JSON side-by-side so user can edit.
+
+RFP detail page lists sent vendors and inbound proposals with attach/download links.
+
+Comparison page shows table of vendors vs key metrics and a highlighted recommended vendor with AI explanation.
+
+Final checklist to include in top-level README (so reviewer sees everything)
+
+ Public GitHub repo with /frontend and /backend
+
+ .env.example
+
+ README (setup + API docs + decisions + assumptions)
+
+ Seed data and seed script
+
+ Demo video (5–10 min) link inside README
+
+ AI prompt templates included
+
+ Email integration implemented (sending working; receiving via webhook or IMAP example)
+
+ LLM used for NL→RFP, parse reply, and recommendations (include sample prompts)
+
+ Basic tests for scoring/parsing
+
+ Postman collection or example curl calls
